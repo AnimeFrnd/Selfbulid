@@ -1,0 +1,4 @@
+telethon
+nest-asyncio
+pymongo
+dnspython
