@@ -1,4 +1,4 @@
-telethon
-nest-asyncio
+pyrogram==2.0.106
+tgcrypto
+motor
 pymongo
-dnspython
