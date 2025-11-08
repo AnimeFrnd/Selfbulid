@@ -7,11 +7,16 @@ import os
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-SESSION_NAME = os.getenv("SESSION_NAME")
+STRING = os.getenv("STRING_SESSION")
 OWNER = os.getenv("OWNER_USERNAME")
 MONGO = os.getenv("MONGO_URI")
 
-client = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH)
+client = Client(
+    "arya_bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    session_string=STRING
+)
 
 db = motor.motor_asyncio.AsyncIOMotorClient(MONGO)
 session_db = db["autogroups"]["stats"]
@@ -29,9 +34,9 @@ RUSSIAN_TEXTS = [
 ]
 
 COUNTRY_TEXTS = [
-    "UAE group message",
-    "Qatar sample text",
-    "Saudi Arabia text"
+    "UAE message",
+    "Qatar sample",
+    "Saudi Arabia test"
 ]
 
 
@@ -45,7 +50,7 @@ def random_messages(mode):
 
 @client.on_message(filters.command("start"))
 async def start(_, msg):
-    await msg.reply("✅ Auto Group Creator Bot Running\nUse /create to make groups.")
+    await msg.reply("✅ Bot is Online\nUse /create arabic | russian | country")
 
 
 @client.on_message(filters.command("create"))
@@ -56,31 +61,25 @@ async def create_group(_, msg):
         return await msg.reply("Usage: /create arabic OR /create russian OR /create country")
 
     mode = args[1].lower()
-
     if mode not in ["arabic", "russian", "country"]:
         return await msg.reply("Invalid mode.")
 
-    # numbering
     now = datetime.utcnow()
     day = now.strftime("%b %d")
 
     count = random.randint(1, 999)
     group_name = f"{day} Gc {count}"
-
     bio = f"{day} Gc {count} Owner - {OWNER}"
 
-    # create group
     chat = await client.create_group(group_name, [msg.from_user.id])
-
-    # set description
     await client.set_chat_description(chat.id, bio)
 
-    # send sample messages
     for t in random_messages(mode):
         await client.send_message(chat.id, t)
 
-    # save stats
-    await session_db.insert_one({"group": group_name, "mode": mode, "date": str(now)})
+    await session_db.insert_one(
+        {"group": group_name, "mode": mode, "date": str(now)}
+    )
 
     await msg.reply(f"✅ Group Created: {group_name}")
 
