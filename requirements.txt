@@ -1,3 +1,4 @@
 telethon==1.31.1
+flask
 nest-asyncio
 python-dotenv
