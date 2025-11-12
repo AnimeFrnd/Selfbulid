@@ -6,16 +6,14 @@ Telegram Group Creator Userbot (Telethon)
 
 import os
 import asyncio
-import re
 from datetime import datetime
 from telethon import TelegramClient, events, functions
 from telethon.sessions import StringSession
 from telethon.errors import FloodWaitError
-
-# ------- Koyeb web server -------
 from flask import Flask
 import threading
 
+# ------- Koyeb web server -------
 app = Flask(__name__)
 
 @app.route("/")
@@ -43,6 +41,7 @@ if API_ID == 0 or not API_HASH:
     print("ERROR: API_ID/API_HASH missing")
     exit(1)
 
+
 # ---------- Message banks ----------
 ARABIC_MESSAGES = [
     "مرحبا بالجميع!", "كيف الحال؟", "أهلا وسهلا!", "من أي بلد أنتم؟",
@@ -60,6 +59,7 @@ MIDDLE_EAST_SAMPLE_MESSAGES = {
     'lebanon': ["أهلا من لبنان!", "كيف بيروت اليوم؟", "مرحبا جميعا!"] * 7,
 }
 
+
 # ---------- Bot state ----------
 state = {
     'mode': DEFAULT_MODE,
@@ -69,8 +69,10 @@ state = {
     'today_created': 0,
 }
 
+
 # ---------- Helpers ----------
-def month_short_name(dt): return dt.strftime('%b')
+def month_short_name(dt):
+    return dt.strftime('%b')
 
 def build_group_name(i):
     now = datetime.now()
@@ -84,8 +86,10 @@ def build_bio(group_name):
     return BIO_TEMPLATE.format(group_name=group_name, owner=state['owner'])
 
 def messages_for_mode(mode):
-    if mode == "arabic": return ARABIC_MESSAGES
-    if mode == "russian": return RUSSIAN_MESSAGES
+    if mode == "arabic":
+        return ARABIC_MESSAGES
+    if mode == "russian":
+        return RUSSIAN_MESSAGES
     if mode.startswith("middleeast:"):
         country = mode.split(":", 1)[1]
         return MIDDLE_EAST_SAMPLE_MESSAGES.get(country, MIDDLE_EAST_SAMPLE_MESSAGES["egypt"])
@@ -107,12 +111,19 @@ async def is_owner(event):
         return False
 
 
-# -------- Commands (fix: no outgoing=True) --------
+# -------- Commands --------
 
 @client.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
     if not await is_owner(event): return
-    await event.reply("✅ Userbot Active!\nCommands:\n/set_mode\n/start_create 10\n/stop\n/status")
+    await event.reply(
+        "✅ Userbot Active!\n\nCommands:\n"
+        "/set_mode <arabic|russian|middleeast:country>\n"
+        "/start_create <count>\n"
+        "/stop\n"
+        "/status\n"
+        "/autodelete on|off\n"
+    )
 
 
 @client.on(events.NewMessage(pattern=r'^/set_mode (.+)'))
@@ -129,7 +140,6 @@ async def mode_handler(event):
 @client.on(events.NewMessage(pattern=r'^/start_create (\d+)'))
 async def create_handler(event):
     if not await is_owner(event): return
-
     count = int(event.pattern_match.group(1))
 
     if state['creating']:
@@ -183,8 +193,55 @@ async def stop_handler(event):
 async def status_handler(event):
     if not await is_owner(event): return
     await event.reply(
-        f"📊 Status:\nTotal: {state['total_created']}\nToday: {state['today_created']}\nActive: {state['creating']}"
+        f"📊 Status:\n"
+        f"Total: {state['total_created']}\n"
+        f"Today: {state['today_created']}\n"
+        f"Active: {state['creating']}"
     )
+
+
+# -------- Auto Delete Join/Leave/Pin Messages --------
+AUTO_DELETE = False
+DELETE_KEYWORDS = [
+    "joined the group",
+    "left the group",
+    "was removed",
+    "was kicked",
+    "pinned a message",
+    "unpinned a message"
+]
+
+@client.on(events.NewMessage(pattern=r"^/autodelete(?:\s+(on|off))?$"))
+async def toggle_autodelete(event):
+    """Turn AutoDelete on/off or check status"""
+    global AUTO_DELETE
+    if not await is_owner(event):
+        return
+    arg = event.pattern_match.group(1)
+    if not arg:
+        await event.reply(f"🧹 AutoDelete is currently **{'ON' if AUTO_DELETE else 'OFF'}**")
+        return
+    AUTO_DELETE = (arg.lower() == "on")
+    await event.reply(f"🧹 AutoDelete is now **{'ON' if AUTO_DELETE else 'OFF'}**")
+
+@client.on(events.NewMessage())
+async def auto_delete_messages(event):
+    """Deletes join/leave/pin system messages when enabled"""
+    if not AUTO_DELETE:
+        return
+    try:
+        if not event.is_group:
+            return
+
+        if event.message.action:
+            await event.delete()
+            return
+
+        text = (event.raw_text or "").lower()
+        if any(k in text for k in DELETE_KEYWORDS):
+            await event.delete()
+    except Exception as e:
+        print("Delete error:", e)
 
 
 # ---------- Start ----------
