@@ -1,4 +1,3 @@
-# main.py
 """
 Telegram Group Creator Userbot (Telethon)
 + Koyeb Health Check Fix (Flask Web Server on port 8000)
@@ -26,7 +25,6 @@ def run_web():
 threading.Thread(target=run_web).start()
 # ----------------------------------------
 
-
 # ---------- Load ENV ----------
 API_ID = int(os.getenv('API_ID', '0'))
 API_HASH = os.getenv('API_HASH', '')
@@ -40,7 +38,6 @@ DEFAULT_MODE = os.getenv('MODE', 'arabic')
 if API_ID == 0 or not API_HASH:
     print("ERROR: API_ID/API_HASH missing")
     exit(1)
-
 
 # ---------- Message banks ----------
 ARABIC_MESSAGES = [
@@ -59,7 +56,6 @@ MIDDLE_EAST_SAMPLE_MESSAGES = {
     'lebanon': ["أهلا من لبنان!", "كيف بيروت اليوم؟", "مرحبا جميعا!"] * 7,
 }
 
-
 # ---------- Bot state ----------
 state = {
     'mode': DEFAULT_MODE,
@@ -68,7 +64,6 @@ state = {
     'total_created': 0,
     'today_created': 0,
 }
-
 
 # ---------- Helpers ----------
 def month_short_name(dt):
@@ -95,11 +90,9 @@ def messages_for_mode(mode):
         return MIDDLE_EAST_SAMPLE_MESSAGES.get(country, MIDDLE_EAST_SAMPLE_MESSAGES["egypt"])
     return ARABIC_MESSAGES
 
-
 # ---------- Telethon Client ----------
 session = StringSession(SESSION_STRING)
 client = TelegramClient(session, API_ID, API_HASH)
-
 
 # -------- owner check ---------
 async def is_owner(event):
@@ -110,9 +103,7 @@ async def is_owner(event):
     except:
         return False
 
-
 # -------- Commands --------
-
 @client.on(events.NewMessage(pattern=r'^/start'))
 async def start_handler(event):
     if not await is_owner(event): return
@@ -123,8 +114,8 @@ async def start_handler(event):
         "/stop\n"
         "/status\n"
         "/autodelete on|off\n"
+        "/cleansystem - delete old join/leave/pin msgs\n"
     )
-
 
 @client.on(events.NewMessage(pattern=r'^/set_mode (.+)'))
 async def mode_handler(event):
@@ -135,7 +126,6 @@ async def mode_handler(event):
     else:
         state['mode'] = "middleeast:" + mode
     await event.reply(f"✅ Mode set to {state['mode']}")
-
 
 @client.on(events.NewMessage(pattern=r'^/start_create (\d+)'))
 async def create_handler(event):
@@ -181,13 +171,11 @@ async def create_handler(event):
     state['creating'] = False
     await event.reply("✅ Finished creation.")
 
-
 @client.on(events.NewMessage(pattern=r'^/stop'))
 async def stop_handler(event):
     if not await is_owner(event): return
     state['creating'] = False
     await event.reply("🛑 Stopped.")
-
 
 @client.on(events.NewMessage(pattern=r'^/status'))
 async def status_handler(event):
@@ -198,7 +186,6 @@ async def status_handler(event):
         f"Today: {state['today_created']}\n"
         f"Active: {state['creating']}"
     )
-
 
 # -------- Auto Delete Join/Leave/Pin Messages --------
 AUTO_DELETE = False
@@ -243,6 +230,35 @@ async def auto_delete_messages(event):
     except Exception as e:
         print("Delete error:", e)
 
+# -------- Manual Cleanup Command --------
+@client.on(events.NewMessage(pattern=r"^/cleansystem$"))
+async def clean_system_messages(event):
+    """Deletes old system messages manually"""
+    if not await is_owner(event):
+        return
+
+    if not AUTO_DELETE:
+        await event.reply("⚠️ Please enable AutoDelete first using /autodelete on")
+        return
+
+    chat = await event.get_input_chat()
+    await event.reply("🧹 Starting cleanup of recent system messages...")
+
+    deleted_count = 0
+    async for msg in client.iter_messages(chat, limit=500):
+        try:
+            if msg.action:
+                await msg.delete()
+                deleted_count += 1
+                continue
+            text = (msg.raw_text or "").lower()
+            if any(k in text for k in DELETE_KEYWORDS):
+                await msg.delete()
+                deleted_count += 1
+        except Exception as e:
+            print("Cleanup error:", e)
+
+    await event.reply(f"✅ Cleanup done — deleted {deleted_count} system messages.")
 
 # ---------- Start ----------
 async def main():
@@ -251,7 +267,6 @@ async def main():
     me = await client.get_me()
     print("Logged in as:", me.username or me.first_name)
     await client.run_until_disconnected()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
